@@ -1,0 +1,53 @@
+# Render blueprint for Blackboard Rubric Transfer Tool (Node.js + ltijs)
+# Save this file as: render.yaml (repo root)
+
+services:
+  - type: web
+    name: bb-rubric-transfer
+    env: node
+    plan: starter            # adjust as needed
+    region: oregon           # pick closest to your users (e.g., frankfurt, ohio, etc.)
+    branch: main             # or your default branch
+    autoDeploy: true
+    buildCommand: |
+      npm ci --omit=dev
+    startCommand: |
+      npm start
+    healthCheckPath: /ui/home
+    envVars:
+      # Blackboard base URL (no trailing slash), e.g., https://nahe.blackboard.com
+      - key: BB_BASE_URL
+        sync: false          # set in dashboard
+      # Blackboard REST app credentials (2-legged OAuth)
+      - key: BB_KEY
+        sync: false
+      - key: BB_SECRET
+        sync: false
+      # LTI encryption key used by ltijs (random, long string)
+      - key: LTI_ENCRYPTION_KEY
+        generateValue: true  # you can override in dashboard later
+      # ltijs persistence (Mongo is typical). If you prefer Postgres, see note below.
+      - key: MONGO_URL
+        sync: false
+      # Optional: override port; Render sets PORT automatically
+      - key: PORT
+        value: "3000"
+
+    # Optional: add headers or rewrite rules if you front this with a custom domain.
+    # routes:
+    #   - type: rewrite
+    #     source: /
+    #     destination: /ui/home
+
+# --- Optional managed database(s) ---
+
+# If you prefer a managed Mongo replacement, Render’s native DB is PostgreSQL.
+# For ltijs with Postgres, you’d use a Postgres database and the ltijs Postgres adapter/plugin.
+# The current scaffold uses Mongo; if you want to stick with Mongo, consider a cloud Mongo provider.
+# Uncomment this to add a Render-managed Postgres and set MONGO_URL to a Postgres-compatible URL
+# only if you've adjusted ltijs to use Postgres.
+
+# databases:
+#   - name: bb-rubric-transfer-db
+#     plan: starter
+#     region: oregon
