@@ -10,7 +10,7 @@ services:
       npm ci --omit=dev
     startCommand: |
       npm start
-    healthCheckPath: /ui/home
+    healthCheckPath: /health
     envVars:
       - key: BB_BASE_URL
         sync: false
@@ -24,3 +24,5 @@ services:
         sync: false
       - key: PORT
         value: "3000"
+      - key: NODE_ENV
+        value: "production"

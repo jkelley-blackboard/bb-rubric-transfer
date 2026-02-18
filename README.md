@@ -39,5 +39,5 @@ Instructor **pull** workflow: launch inside destination **Course B**, choose sou
 - Use environment variables locally / Render.
 
 ## Render (optional)
-- Create a Web Service, set env vars (same as `.env`), deploy.
+- Create a Web Service from the blueprint `render.yaml`, set env vars, deploy.
 - TLS is automatic for onrender.com and custom domains.
