@@ -1,5 +1,8 @@
 const path = require('path')
-const { Provider } = require('ltijs')
+
+// ltijs exports differently depending on version — this handles all cases
+const ltijs = require('ltijs')
+const Provider = ltijs.Provider ?? ltijs.default?.Provider ?? ltijs.default ?? ltijs
 
 const LTI = new Provider(
   process.env.LTI_ENCRYPTION_KEY,
@@ -22,7 +25,7 @@ LTI.deploy().then(() => {
   })
 }).catch(err => {
   console.error('[LTI] deploy error:', err)
-  process.exit(1) // Exit so Render knows the service failed to start
+  process.exit(1)
 })
 
 module.exports = LTI
