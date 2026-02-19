@@ -94,8 +94,17 @@ function handleLogin (req, res) {
   const state = crypto.randomBytes(16).toString('hex')
   nonces.set(nonce, Date.now())
 
-  const redirectUri = p.target_link_uri ||
-    `${req.protocol}://${req.get('host')}/launch`
+  // Always use https for redirect_uri — ignore whatever target_link_uri says
+  // (old registrations may have stored http://)
+  const redirectUri = `https://${req.get('host')}/launch`
+
+  // login_hint may arrive URL-encoded — decode it before forwarding
+  const loginHint = p.login_hint ? decodeURIComponent(p.login_hint) : null
+
+  if (!loginHint) {
+    console.error('[LTI /login] login_hint missing! Full params:', JSON.stringify(p))
+    return res.status(400).send('<h2>LTI Error</h2><p>login_hint missing from OIDC initiation request. Check Render logs.</p>')
+  }
 
   const authUrl = new URL(`${reg.platform_url}/learn/api/public/v1/lti/oidc/authorize`)
   authUrl.searchParams.set('response_type', 'id_token')
@@ -104,11 +113,7 @@ function handleLogin (req, res) {
   authUrl.searchParams.set('prompt', 'none')
   authUrl.searchParams.set('client_id', reg.client_id)
   authUrl.searchParams.set('redirect_uri', redirectUri)
-  if (!p.login_hint) {
-    console.error('[LTI /login] login_hint missing! Full params:', JSON.stringify(p))
-    return res.status(400).send('<h2>LTI Error</h2><p>login_hint missing from OIDC initiation request. Check Render logs.</p>')
-  }
-  authUrl.searchParams.set('login_hint', p.login_hint)
+  authUrl.searchParams.set('login_hint', loginHint)
   authUrl.searchParams.set('lti_message_hint', p.lti_message_hint || '')
   authUrl.searchParams.set('nonce', nonce)
   authUrl.searchParams.set('state', state)
