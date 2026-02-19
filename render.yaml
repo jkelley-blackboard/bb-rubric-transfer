@@ -6,10 +6,8 @@ services:
     region: oregon
     branch: main
     autoDeploy: true
-    buildCommand: |
-      npm ci --omit=dev
-    startCommand: |
-      npm start
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
     healthCheckPath: /health
     envVars:
       - key: BB_BASE_URL
@@ -18,10 +16,12 @@ services:
         sync: false
       - key: BB_SECRET
         sync: false
-      - key: LTI_ENCRYPTION_KEY
-        generateValue: true
-      - key: MONGO_URL
+      - key: LTI_CLIENT_ID
         sync: false
+      - key: LTI_PLATFORM_URL
+        sync: false
+      - key: LTI_COOKIE_SECRET
+        generateValue: true
       - key: PORT
         value: "3000"
       - key: NODE_ENV

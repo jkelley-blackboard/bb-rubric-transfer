@@ -1,41 +1,22 @@
 require('dotenv').config()
 
+const express = require('express')
 const path = require('path')
-const { Provider } = require('ltijs')  // ltijs v5: Provider is a singleton instance, not a class
+const ltiRouter = require('./src/lti')
+const uiRouter = require('./src/routes/ui')
+
+const app = express()
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
+// Health check
+app.get('/health', (req, res) => res.json({ status: 'ok' }))
+
+// LTI 1.3 endpoints
+app.use('/', ltiRouter)
+
+// UI routes
+app.use('/ui', uiRouter)
 
 const port = parseInt(process.env.PORT || '3000', 10)
-
-// Configure via setup() — do NOT use "new Provider()"
-Provider.setup(
-  process.env.LTI_ENCRYPTION_KEY,
-  { url: process.env.MONGO_URL || 'mongodb://localhost:27017/lti' },
-  {
-    staticPath: path.join(__dirname, 'src', 'views'),
-    serverAddon: (app) => {
-      // Health check — no DB/LTI dependency
-      app.get('/health', (req, res) => res.json({ status: 'ok' }))
-
-      // Mount UI routes
-      const uiRouter = require('./src/routes/ui')
-      app.use('/ui', uiRouter)
-    }
-  }
-)
-
-Provider.appUrl('/')
-Provider.loginUrl('/login')
-
-Provider.onConnect(async (token, req, res) => {
-  const destContext = token?.platformContext?.context
-  const destCourseId = destContext?.id
-  req.session = req.session || {}
-  req.session.destCourseId = destCourseId
-  return res.redirect(`/ui/home?courseId=${encodeURIComponent(destCourseId || '')}`)
-})
-
-Provider.deploy({ port })
-  .then(() => console.log(`[bb-rubric-transfer] listening on :${port}`))
-  .catch(err => {
-    console.error('[LTI] deploy error:', err)
-    process.exit(1)
-  })
+app.listen(port, () => console.log(`[bb-rubric-transfer] listening on :${port}`))
