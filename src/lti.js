@@ -172,16 +172,13 @@ router.post('/launch', async (req, res) => {
     const context = claims['https://purl.imsglobal.org/spec/lti/claim/context']
     const courseId = context?.id || ''
 
-    // Store in a signed cookie (no DB needed)
-    const sessionData = { courseId, exp: Date.now() + 3600_000 }
-    res.cookie('lti_session', signCookie(sessionData, COOKIE_SECRET), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'None',  // required for iframe embedding in Blackboard
-      maxAge: 3600_000
-    })
+    // Extract one_time_session_token — lets BB silently authorize without consent screen
+    const oneTimeToken = claims['https://blackboard.com/lti/claim/one_time_session_token'] || ''
 
-    return res.redirect(`/ui/home?courseId=${encodeURIComponent(courseId)}`)
+    // Kick off 3LO — one_time_session_token means instructor won't see a consent screen
+    const oauthParams = new URLSearchParams({ courseId })
+    if (oneTimeToken) oauthParams.set('one_time_session_token', oneTimeToken)
+    return res.redirect(`/oauth/start?${oauthParams.toString()}`)
   } catch (err) {
     console.error('[LTI] launch error:', err.message)
     return res.status(400).send(`
