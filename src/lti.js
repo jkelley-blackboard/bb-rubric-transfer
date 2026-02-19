@@ -106,12 +106,9 @@ function handleLogin (req, res) {
     return res.status(400).send('<h2>LTI Error</h2><p>login_hint missing from OIDC initiation request. Check Render logs.</p>')
   }
 
-  // Use the iss param BB sends (most reliable), then env var, then saved registration
-  // Never use developer.blackboard.com — that's the registry, not the auth server
-  const platformUrl = (p.iss && !p.iss.includes('developer.blackboard.com') ? p.iss : null)
-    || process.env.LTI_PLATFORM_URL
-    || reg.platform_url
-  const authUrl = new URL(`${platformUrl}/learn/api/public/v1/lti/oidc/authorize`)
+  // Blackboard SaaS always uses the developer portal as the OIDC auth endpoint,
+  // regardless of which BB instance the tool is deployed on.
+  const authUrl = new URL('https://developer.blackboard.com/api/v1/gateway/oidcauth')
   authUrl.searchParams.set('response_type', 'id_token')
   authUrl.searchParams.set('response_mode', 'form_post')
   authUrl.searchParams.set('scope', 'openid')
