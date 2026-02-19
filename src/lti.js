@@ -139,6 +139,19 @@ router.post('/launch', async (req, res) => {
     }
     nonces.delete(claims.nonce)
 
+    // Enforce instructor-only access — belt-and-suspenders beyond the placement type
+    const roles = claims['https://purl.imsglobal.org/spec/lti/claim/roles'] || []
+    const INSTRUCTOR_ROLES = [
+      'http://purl.imsglobal.org/vocab/lis/v2/membership#Instructor',
+      'http://purl.imsglobal.org/vocab/lis/v2/membership#ContentDeveloper',
+      'http://purl.imsglobal.org/vocab/lis/v2/institution/person#Administrator',
+      'http://purl.imsglobal.org/vocab/lis/v2/system/person#Administrator'
+    ]
+    const isInstructor = roles.some(r => INSTRUCTOR_ROLES.includes(r))
+    if (!isInstructor) {
+      return res.status(403).send('<h2>Access denied</h2><p>This tool is only available to instructors.</p>')
+    }
+
     // Extract course context from LTI claims
     const context = claims['https://purl.imsglobal.org/spec/lti/claim/context']
     const courseId = context?.id || ''
