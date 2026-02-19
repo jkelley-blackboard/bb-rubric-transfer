@@ -1,6 +1,7 @@
 const axios = require('axios')
 
-const BB_BASE = process.env.BB_BASE_URL        // e.g., https://your-learn.example.edu
+// BB_BASE_URL is optional — falls back to LTI_PLATFORM_URL which is already required
+const BB_BASE = process.env.BB_BASE_URL || process.env.LTI_PLATFORM_URL
 const BB_KEY  = process.env.BB_KEY
 const BB_SECRET = process.env.BB_SECRET
 
