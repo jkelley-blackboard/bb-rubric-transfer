@@ -84,6 +84,11 @@ function handleLogin (req, res) {
     `)
   }
 
+  // Debug — log exactly what BB sends so we can diagnose missing params
+  console.log('[LTI /login] method:', req.method)
+  console.log('[LTI /login] query:', JSON.stringify(req.query))
+  console.log('[LTI /login] body:', JSON.stringify(req.body))
+
   const p = { ...req.query, ...req.body }
   const nonce = crypto.randomBytes(16).toString('hex')
   const state = crypto.randomBytes(16).toString('hex')
@@ -99,6 +104,10 @@ function handleLogin (req, res) {
   authUrl.searchParams.set('prompt', 'none')
   authUrl.searchParams.set('client_id', reg.client_id)
   authUrl.searchParams.set('redirect_uri', redirectUri)
+  if (!p.login_hint) {
+    console.error('[LTI /login] login_hint missing! Full params:', JSON.stringify(p))
+    return res.status(400).send('<h2>LTI Error</h2><p>login_hint missing from OIDC initiation request. Check Render logs.</p>')
+  }
   authUrl.searchParams.set('login_hint', p.login_hint)
   authUrl.searchParams.set('lti_message_hint', p.lti_message_hint || '')
   authUrl.searchParams.set('nonce', nonce)
