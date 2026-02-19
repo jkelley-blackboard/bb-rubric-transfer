@@ -1,54 +1,111 @@
+/**
+ * Standalone Blackboard 3LO test
+ * 
+ * Deploy this as a separate Render service, or temporarily replace server.js.
+ * Visit https://your-app.onrender.com/ to start the flow.
+ * 
+ * Required env vars:
+ *   BB_KEY           - your app key (NOT the Application ID — the Key)
+ *   BB_SECRET        - your app secret
+ *   BB_URL           - https://nahe.blackboard.com
+ *   APP_URL          - https://your-app.onrender.com
+ *   PORT             - set automatically by Render
+ */
+
 require('dotenv').config()
-
-// Prevent a single unhandled async error from crashing the server
-process.on('unhandledRejection', (err) => {
-  console.error('[unhandledRejection]', err?.message || err)
-})
-process.on('uncaughtException', (err) => {
-  console.error('[uncaughtException]', err?.message || err)
-})
-
 const express = require('express')
-const cookieParser = require('cookie-parser')
-const path = require('path')
-const ltiRouter = require('./src/lti')
-const oauthRouter = require('./src/oauth')
-const registrationRouter = require('./src/registration')
-const uiRouter = require('./src/routes/ui')
-
+const crypto = require('crypto')
+const axios = require('axios')
 const app = express()
 
-// Trust Render's load balancer so req.protocol returns 'https' correctly
-app.set('trust proxy', 1)
+const BB_URL      = process.env.BB_URL || process.env.LTI_PLATFORM_URL
+const BB_KEY      = process.env.BB_KEY
+const BB_SECRET   = process.env.BB_SECRET
+const APP_URL     = (process.env.APP_URL || '').replace(/\/$/, '')
+const CALLBACK    = `${APP_URL}/callback`
 
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
-app.use(cookieParser())
+// Simple in-memory state (fine for a test, single instance)
+let pendingState = null
 
-// Health check
-app.get('/health', (req, res) => res.json({ status: 'ok' }))
+app.get('/', (req, res) => {
+  const authUrl = new URL(`${BB_URL}/learn/api/public/v1/oauth2/authorizationcode`)
+  pendingState = crypto.randomBytes(16).toString('hex')
 
-// Root — tool must be launched from Blackboard
-app.get('/', (req, res) => res.send(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Rubric Transfer</title>
-<style>body{font-family:system-ui,sans-serif;max-width:480px;margin:80px auto;text-align:center;color:#475569}</style>
-</head><body>
-<h2>Rubric Transfer</h2>
-<p>This tool must be launched from within a Blackboard course.</p>
-<p>Contact your administrator if you need access.</p>
-</body></html>`))
+  authUrl.searchParams.set('response_type', 'code')
+  authUrl.searchParams.set('client_id', BB_KEY)
+  authUrl.searchParams.set('redirect_uri', CALLBACK)
+  authUrl.searchParams.set('scope', 'read write')
+  authUrl.searchParams.set('state', pendingState)
 
-// LTI Dynamic Registration
-app.use('/', registrationRouter)
+  console.log('[3LO] Starting auth, redirecting to:', authUrl.toString())
 
-// OAuth 3LO
-app.use('/', oauthRouter)
+  res.send(`<!DOCTYPE html><html><body>
+    <h2>Blackboard 3LO Test</h2>
+    <p>Config:</p>
+    <ul>
+      <li>BB_URL: ${BB_URL}</li>
+      <li>BB_KEY: ${BB_KEY}</li>
+      <li>CALLBACK: ${CALLBACK}</li>
+    </ul>
+    <p><a href="${authUrl.toString()}">Click here to start 3LO auth →</a></p>
+    <p><small>(Opens Blackboard login/consent page directly)</small></p>
+  </body></html>`)
+})
 
-// LTI 1.3 endpoints
-app.use('/', ltiRouter)
+app.get('/callback', async (req, res) => {
+  const { code, state, error } = req.query
 
-// UI routes
-app.use('/ui', uiRouter)
+  console.log('[3LO callback] query:', req.query)
+
+  if (error) {
+    return res.send(`<h2>Error from BB:</h2><pre>${error}</pre>`)
+  }
+
+  if (state !== pendingState) {
+    return res.send(`<h2>State mismatch</h2><p>Expected: ${pendingState}</p><p>Got: ${state}</p>`)
+  }
+
+  try {
+    const resp = await axios.post(
+      `${BB_URL}/learn/api/public/v1/oauth2/token`,
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: CALLBACK
+      }),
+      { auth: { username: BB_KEY, password: BB_SECRET } }
+    )
+
+    const { access_token, refresh_token, expires_in, user_id } = resp.data
+    console.log('[3LO] Token exchange success! user_id:', user_id)
+
+    // Test: fetch the current user's profile
+    const me = await axios.get(
+      `${BB_URL}/learn/api/public/v1/users/me`,
+      { headers: { Authorization: `Bearer ${access_token}` } }
+    )
+
+    res.send(`<!DOCTYPE html><html><body>
+      <h2>✅ 3LO Success!</h2>
+      <p><strong>User ID:</strong> ${user_id}</p>
+      <p><strong>Username:</strong> ${me.data.userName}</p>
+      <p><strong>Name:</strong> ${me.data.name?.given} ${me.data.name?.family}</p>
+      <p><strong>Token expires in:</strong> ${expires_in}s</p>
+      <p><strong>Has refresh token:</strong> ${!!refresh_token}</p>
+      <hr>
+      <pre>${JSON.stringify(me.data, null, 2)}</pre>
+    </body></html>`)
+  } catch (err) {
+    const detail = err.response?.data ? JSON.stringify(err.response.data, null, 2) : err.message
+    console.error('[3LO] token exchange failed:', detail)
+    res.send(`<h2>❌ Token exchange failed</h2><pre>${detail}</pre>`)
+  }
+})
 
 const port = parseInt(process.env.PORT || '3000', 10)
-app.listen(port, () => console.log(`[bb-rubric-transfer] listening on :${port}`))
+app.listen(port, () => {
+  console.log(`[3LO test] listening on :${port}`)
+  console.log(`[3LO test] BB_URL: ${BB_URL}`)
+  console.log(`[3LO test] BB_KEY: ${BB_KEY}`)
+  console.log(`[3LO test] CALLBACK: ${CALLBACK}`)
+})
