@@ -18,6 +18,12 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 
+// Use X-Forwarded-Proto if present (Render terminates SSL at the load balancer)
+function getProto (req) {
+  return req.get('x-forwarded-proto') || getProto(req)
+}
+
+
 const KEYS_FILE = path.join('/tmp', 'lti_keypair.json')
 const REG_FILE  = path.join('/tmp', 'lti_registration.json')
 
@@ -124,11 +130,11 @@ router.get('/registration', async (req, res) => {
       <h2>LTI Dynamic Registration</h2>
       <p>This is the <strong>Tool Initiation URL</strong> for dynamic registration.</p>
       <p>Paste it into Blackboard's LTI Dynamic Registration page — don't open it directly.</p>
-      <p><code>${req.protocol}://${req.get('host')}/registration</code></p>
+      <p><code>${getProto(req)}://${req.get('host')}/registration</code></p>
     `)
   }
 
-  const toolUrl = `${req.protocol}://${req.get('host')}`
+  const toolUrl = `${getProto(req)}://${req.get('host')}`
 
   try {
     // Step 1: Fetch Blackboard's OpenID configuration

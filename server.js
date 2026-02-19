@@ -7,6 +7,10 @@ const registrationRouter = require('./src/registration')
 const uiRouter = require('./src/routes/ui')
 
 const app = express()
+
+// Trust Render's load balancer so req.protocol returns 'https' correctly
+app.set('trust proxy', 1)
+
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
