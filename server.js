@@ -3,6 +3,7 @@ require('dotenv').config()
 const express = require('express')
 const path = require('path')
 const ltiRouter = require('./src/lti')
+const registrationRouter = require('./src/registration')
 const uiRouter = require('./src/routes/ui')
 
 const app = express()
@@ -11,6 +12,9 @@ app.use(express.urlencoded({ extended: true }))
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok' }))
+
+// LTI Dynamic Registration
+app.use('/', registrationRouter)
 
 // LTI 1.3 endpoints
 app.use('/', ltiRouter)
