@@ -62,12 +62,8 @@ function setCookie (res, data) {
   })
 }
 
-// In-memory state store (CSRF protection)
-const oauthStates = new Map()
-setInterval(() => {
-  const cutoff = Date.now() - 10 * 60 * 1000
-  for (const [k, v] of oauthStates) if (v.ts < cutoff) oauthStates.delete(k)
-}, 60_000)
+// OAuth state stored in a short-lived signed cookie (survives across server restarts)
+// rather than in-memory (which breaks on Render when instances restart between requests)
 
 // ── Step 1: Start OAuth ───────────────────────────────────────────────────────
 
@@ -81,7 +77,15 @@ router.get('/oauth/start', (req, res) => {
   const { courseId, one_time_session_token } = req.query
 
   const state = crypto.randomBytes(16).toString('hex')
-  oauthStates.set(state, { courseId, ts: Date.now() })
+
+  // Store state in a short-lived signed cookie — survives server restarts
+  // unlike in-memory Maps which are wiped when Render spins up a new instance
+  res.cookie('oauth_state', signCookie({ state, courseId, ts: Date.now() }), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'None',
+    maxAge: 10 * 60 * 1000  // 10 minutes
+  })
 
   const authUrl = new URL(`${BB_BASE}/learn/api/public/v1/oauth2/authorizationcode`)
   authUrl.searchParams.set('response_type', 'code')
@@ -111,11 +115,14 @@ router.get('/oauth/callback', async (req, res) => {
     return res.status(400).send(`<h2>Authorization declined</h2><p>${error}</p>`)
   }
 
-  const saved = oauthStates.get(state)
-  if (!saved) {
+  // Recover state from cookie instead of in-memory map
+  const savedCookie = verifyCookie(req.cookies?.oauth_state)
+  if (!savedCookie || savedCookie.state !== state) {
     return res.status(400).send('<h2>Invalid or expired OAuth state — please try launching the tool again from Blackboard.</h2>')
   }
-  oauthStates.delete(state)
+  const saved = savedCookie
+  // Clear the state cookie
+  res.clearCookie('oauth_state', { sameSite: 'None', secure: true })
 
   try {
     const resp = await axios.post(
