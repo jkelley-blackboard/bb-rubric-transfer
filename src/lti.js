@@ -120,7 +120,20 @@ function handleLogin (req, res) {
   authUrl.searchParams.set('nonce', nonce)
   authUrl.searchParams.set('state', state)
 
-  res.redirect(authUrl.toString())
+  const authUrlStr = authUrl.toString()
+  console.log('[LTI /login] redirecting to:', authUrlStr)
+
+  // Must break out of Blackboard's iframe — developer.blackboard.com blocks
+  // frame-ancestors. Use window.top to navigate the whole browser window.
+  res.send(
+    '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' +
+    '<script>' +
+    'var u=' + JSON.stringify(authUrlStr) + ';' +
+    'if(window.top!==window.self){window.top.location.href=u;}' +
+    'else{window.location.href=u;}' +
+    '</' + 'script>' +
+    '</body></html>'
+  )
 }
 
 /**
