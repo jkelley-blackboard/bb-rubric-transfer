@@ -203,7 +203,9 @@ router.get('/registration', async (req, res) => {
     // Step 4: Save registration details
     const savedReg = {
       client_id: clientId,
-      platform_url: new URL(openid_configuration).origin,
+      // Prefer LTI_PLATFORM_URL env var — developer.blackboard.com is the registry,
+      // not the actual OIDC server for SaaS instances
+      platform_url: process.env.LTI_PLATFORM_URL || new URL(openid_configuration).origin,
       platform_oidc_url: openid_configuration,
       platform_auth_url: openidConfig.authorization_endpoint,
       platform_jwks_url: openidConfig.jwks_uri,
